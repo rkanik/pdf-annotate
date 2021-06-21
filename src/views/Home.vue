@@ -1,168 +1,134 @@
 <template>
-	<div id="pdfviewer" class="py-8">
-		<pdf
-			:id="i"
-			:key="i"
-			:page="i"
-			:text="false"
-			:src="pdfdata"
-			:annotation="true"
-			:scale.sync="scale"
-			v-for="i in numPages"
-			@annotations="listAnnotations"
-		/>
-		<v-container v-if="isLoading" fill-height>
-			<v-progress-circular
-				:size="50"
-				color="primary"
-				class="mx-auto"
-				indeterminate
-			/>
-		</v-container>
+	<div class="grey darken-3 d-flex relative">
+		<v-navigation-drawer>
+			<div class="pa-4">
+				<v-subheader>SHAPES</v-subheader>
+				<div class="d-flex">
+					<v-btn depressed height="64" class="rounded-0 flex-1">
+						<v-icon>mdi-checkbox-blank-outline</v-icon>
+					</v-btn>
+					<v-btn depressed height="64" class="rounded-0 flex-1">
+						<v-icon>mdi-checkbox-blank-circle-outline</v-icon>
+					</v-btn>
+				</div>
+			</div>
+		</v-navigation-drawer>
+		<div class="overflow-y-auto">
+			<v-container class="py-8">
+				<PDFPage
+					:key="pageNum"
+					:elType="14"
+					:loggedIn="true"
+					:rootScale="scale"
+					:pageNumber="pageNum"
+					:pdfPage="pdfPages[pageNum - 1]"
+					v-for="pageNum in count.pages"
+				/>
+			</v-container>
+		</div>
 	</div>
 </template>
+
 <script>
 
-import PdfViewer from '../components/PdfViewer'
+// PDFJS
+import PDF from "pdfjs-dist/build/pdf";
+PDF.GlobalWorkerOptions.workerSrc = "pdfjs-dist/build/pdf.worker.entry";
+
+// ANNOTPDF
+import { AnnotationFactory, AnnotationIcon } from 'annotpdf';
+
+// COMPONENTS
+import PDFPage from '@/components/PDFPage'
 
 export default {
+	name: 'Home',
 	components: {
-		pdf: PdfViewer
+		PDFPage
 	},
-	data() {
-		return {
-			el: null,
-			pdfdata: null,
-
-			isLoading: false,
-
-			page: 1,
-			scale: 1,
-			maxScale: 2,
-			minScale: 0.1,
-			numPages: 0,
-
-			transform: {},
-
-			pages: [],
-			tempAnnotations: [],
-			annotationsLayer: [],
-		}
-	},
+	data: () => ({
+		pdf: null,
+		scale: 1.5,
+		pdfPages: [],
+		count: {
+			pages: 0
+		},
+		tool: ''
+	}),
 	created() {
-		let scale = window.innerWidth / 100 / 16
-		this.scale = scale > 0.9 ? scale : 0.9
-		this.handleWindowResize()
-	},
-	async mounted() {
-		this.isLoading = true
-		this.getPdf()
-		this.el = document.getElementById('pdfviewer')
-	},
-	computed: {
-		formattedZoom() {
-			return Number.parseInt(this.scale * 100)
-		},
-		mobileScreen() {
-			return window.innerWidth <= 768 ? true : false
-		},
-	},
-	watch: {
-		page(p) {
-			if (
-				window.pageYOffset <= this.findPos(document.getElementById(p)) ||
-				(document.getElementById(p + 1) &&
-					window.pageYOffset >= this.findPos(document.getElementById(p + 1)))
-			) {
-				document.getElementById(p).scrollIntoView()
-			}
-		},
-	},
-	filters: {
-		pretty: function (value) {
-			return JSON.stringify(value, null, 2)
-		},
-	},
-	methods: {
-		handleWindowResize() {
-			window.onresize = e => {
-				let scale = e.target.innerWidth / 100 / 10
-				if (scale <= this.maxScale && scale >= this.minScale) {
-					this.setScale(scale)
+
+
+
+		console.log("FETCH", this.file)
+
+		PDF.getDocument('./pdf/sample.daycare.form.pdf').promise.then(pdf => {
+
+			console.log('pdfJs.getDocument', pdf)
+			console.log("PDF", pdf)
+
+			pdf.getData().then((data) => {
+				let pdfFactory = new AnnotationFactory(data)
+				console.log('AnnotationFactory', pdfFactory)
+
+
+
+				// pdfFactory.createTextAnnotation({
+				// 	page: 1,
+				// 	rect: [100, 100, 200, 200],
+				// 	contents: "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book.",
+				// 	author: "RK ANIK"
+				// })
+
+				pdfFactory.createStrikeOutAnnotation({
+					page: 1,
+					rect: [100, 100, 200, 200],
+					contents: "Test123",
+					author: "John",
+					color: { r: 128, g: 128, b: 128 },
+					opacity: 0.5
+				})
+
+				pdfFactory.createPolygonAnnotation({
+					page: 1,
+					rect: [100, 100, 200, 200],
+					contents: "Lorem Ipsum",
+					author: "RK ANIK",
+					vertices: [
+						100, 100, 400, 100, 400, 400, 100, 400
+					],
+					color: { r: 0, g: 0, b: 0 }
+				})
+
+				pdfFactory.createTextAnnotation({
+					page: 1,
+					rect: [50, 50, 80, 80],
+					contents: "Pop up note",
+					author: "Max",
+					color: { r: 128, g: 128, b: 128 },
+					open: false,
+					icon: AnnotationIcon.Help,
+					opacity: 0.5
+				})
+
+
+
+				this.pdf = pdfFactory.write();
+				this.count.pages = pdf.numPages;
+				for (let i = 1; i <= pdf.numPages; i++) {
+					pdf.getPage(i).then(page => {
+						this.pdfPages.push(page);
+					});
+					// if (i == pdf.numPages - 1) this.isLoading.fetchingPdf = false;
 				}
-			}
-		},
-		listAnnotations(data, page) {
-			this.tempAnnotations.push(data)
-			this.pages = this.pages.concat(page)
 
-			if (this.numPages && this.numPages === data.page) {
-				this.annotationsLayer = this.tempAnnotations
-				this.isLoading = false
-			}
-		},
-		setScale(scale) {
-			this.scale = scale
-		},
-		findPos: el => el ? el.offsetTop : null,
-		getPdf() {
-
-			this.pdfdata = PdfViewer.createLoadingTask('./pdf/employee.form.pdf')
-			this.pdfdata.then(pdf => {
-				this.numPages = pdf.numPages
-				window.onscroll = () => {
-					let i = 1, count = Number(pdf.numPages)
-					let scale = this.scale
-					do {
-						scale = this.mobileScreen
-							? this.transform.scale
-								? this.transform.scale
-								: this.scale
-							: 1
-						if (
-							window.pageYOffset >= this.findPos(document.getElementById(i)) * scale &&
-							window.pageYOffset <= this.findPos(document.getElementById(i + 1)) * scale
-						) {
-							this.page = i
-						}
-						i++
-					} while (i < count)
-
-					if (window.pageYOffset >= this.findPos(document.getElementById(i)) * scale) {
-						this.page = i
-					}
-					this.isLoading = false
-				}
+				// pdfFactory.save()
+				// pdfFactory.download()
 			})
-		},
-	},
+
+
+		}).catch(err => {
+			console.log("PDF_FETCH_ERROR", err)
+		})
+	}
 }
 </script>
-<style lang='scss'>
-	#pdfviewer {
-		position: relative;
-		background-color: #212121;
-		min-height: calc(100vh - 64px);
-		.annotationLayer {
-			.textWidgetAnnotation input,
-			.textWidgetAnnotation textarea,
-			.choiceWidgetAnnotation select,
-			.buttonWidgetAnnotation.checkBox input,
-			.buttonWidgetAnnotation.radioButton input {
-				background-color: rgba(245, 239, 68, 0.13);
-				border: 1px solid rgb(211, 206, 52);
-				font-size: 9px;
-			}
-		}
-		.page {
-			margin: 0 auto;
-			position: relative;
-			box-shadow: 0px 2px 1px -1px rgba(0, 0, 0, 0.2),
-				0px 1px 1px 0px rgba(0, 0, 0, 0.14),
-				0px 1px 3px 0px rgba(0, 0, 0, 0.12) !important;
-		}
-		& > div:not(:first-child) {
-			margin-top: 2rem;
-		}
-	}
-</style>
