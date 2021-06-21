@@ -1,3 +1,12 @@
 .overflow-y-auto {
 	overflow-y: auto;
 }
+.h-screen {
+	height: 100vh !important;
+}
+.flex-1 {
+	flex: 1 !important;
+}
+.h-screen-eh {
+	height: calc(100vh - 64px);
+}

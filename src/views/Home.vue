@@ -1,27 +1,40 @@
 <template>
 	<div class="grey darken-3 d-flex relative">
-		<v-navigation-drawer>
-			<div class="pa-4">
-				<v-subheader>SHAPES</v-subheader>
-				<div class="d-flex">
-					<v-btn depressed height="64" class="rounded-0 flex-1">
-						<v-icon>mdi-checkbox-blank-outline</v-icon>
-					</v-btn>
-					<v-btn depressed height="64" class="rounded-0 flex-1">
-						<v-icon>mdi-checkbox-blank-circle-outline</v-icon>
-					</v-btn>
+		<div>
+			<v-navigation-drawer permanent>
+				<div class="pa-4 h-screen-eh d-flex flex-column">
+					<v-subheader>SHAPES</v-subheader>
+					<div class="d-flex">
+						<v-btn
+							depressed
+							height="64"
+							:key="tool.type"
+							v-for="tool in tools"
+							class="rounded-0 flex-1"
+							@click="activetool = tool.type"
+							:color="tool.type === activetool ? 'primary' : 'white'"
+						>
+							<v-icon>{{ tool.icon }}</v-icon>
+						</v-btn>
+					</div>
+					<div class="mt-auto">
+						<v-btn block depressed color="primary" @click="handleDownload"
+							>download</v-btn
+						>
+					</div>
 				</div>
-			</div>
-		</v-navigation-drawer>
-		<div class="overflow-y-auto">
+			</v-navigation-drawer>
+		</div>
+		<div class="overflow-y-auto h-screen-eh flex-1">
 			<v-container class="py-8">
 				<PDFPage
 					:key="pageNum"
-					:elType="14"
 					:loggedIn="true"
 					:rootScale="scale"
+					:elType="activetool"
 					:pageNumber="pageNum"
 					:pdfPage="pdfPages[pageNum - 1]"
+					@annotate="handleAnnotate"
 					v-for="pageNum in count.pages"
 				/>
 			</v-container>
@@ -33,13 +46,21 @@
 
 // PDFJS
 import PDF from "pdfjs-dist/build/pdf";
+import "pdfjs-dist/web/pdf_viewer.css";
 PDF.GlobalWorkerOptions.workerSrc = "pdfjs-dist/build/pdf.worker.entry";
 
 // ANNOTPDF
-import { AnnotationFactory, AnnotationIcon } from 'annotpdf';
+import { AnnotationFactory } from 'annotpdf';
 
 // COMPONENTS
 import PDFPage from '@/components/PDFPage'
+
+// DATA
+const _toolTypes = {
+	rect: 100,
+	circle: 101,
+	highlight: 102
+}
 
 export default {
 	name: 'Home',
@@ -48,87 +69,53 @@ export default {
 	},
 	data: () => ({
 		pdf: null,
+		pdfFactory: null,
 		scale: 1.5,
 		pdfPages: [],
 		count: {
 			pages: 0
 		},
-		tool: ''
+		activetool: null,
+		tools: [
+			{
+				label: 'Rectangle',
+				type: _toolTypes.rect,
+				icon: 'mdi-checkbox-blank-outline'
+			},
+			{
+				label: 'Highlight',
+				type: _toolTypes.highlight,
+				icon: 'mdi-format-color-highlight'
+			}
+		]
 	}),
-	created() {
+	async created() {
+		try {
+			const pdf = await PDF.getDocument('./pdf/output.pdf').promise
 
+			this.count.pages = pdf.numPages;
+			for (let i = 1; i <= pdf.numPages; i++) {
+				const page = await pdf.getPage(i);
+				this.pdfPages.push(page);
+			}
 
+			console.log(await pdf.getData())
+			this.pdfFactory = new AnnotationFactory(await pdf.getData())
+			console.log(this.pdfFactory)
 
-		console.log("FETCH", this.file)
+		}
+		catch (error) {
+			console.log('Error:', error.message)
+		}
 
-		PDF.getDocument('./pdf/sample.daycare.form.pdf').promise.then(pdf => {
-
-			console.log('pdfJs.getDocument', pdf)
-			console.log("PDF", pdf)
-
-			pdf.getData().then((data) => {
-				let pdfFactory = new AnnotationFactory(data)
-				console.log('AnnotationFactory', pdfFactory)
-
-
-
-				// pdfFactory.createTextAnnotation({
-				// 	page: 1,
-				// 	rect: [100, 100, 200, 200],
-				// 	contents: "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book.",
-				// 	author: "RK ANIK"
-				// })
-
-				pdfFactory.createStrikeOutAnnotation({
-					page: 1,
-					rect: [100, 100, 200, 200],
-					contents: "Test123",
-					author: "John",
-					color: { r: 128, g: 128, b: 128 },
-					opacity: 0.5
-				})
-
-				pdfFactory.createPolygonAnnotation({
-					page: 1,
-					rect: [100, 100, 200, 200],
-					contents: "Lorem Ipsum",
-					author: "RK ANIK",
-					vertices: [
-						100, 100, 400, 100, 400, 400, 100, 400
-					],
-					color: { r: 0, g: 0, b: 0 }
-				})
-
-				pdfFactory.createTextAnnotation({
-					page: 1,
-					rect: [50, 50, 80, 80],
-					contents: "Pop up note",
-					author: "Max",
-					color: { r: 128, g: 128, b: 128 },
-					open: false,
-					icon: AnnotationIcon.Help,
-					opacity: 0.5
-				})
-
-
-
-				this.pdf = pdfFactory.write();
-				this.count.pages = pdf.numPages;
-				for (let i = 1; i <= pdf.numPages; i++) {
-					pdf.getPage(i).then(page => {
-						this.pdfPages.push(page);
-					});
-					// if (i == pdf.numPages - 1) this.isLoading.fetchingPdf = false;
-				}
-
-				// pdfFactory.save()
-				// pdfFactory.download()
-			})
-
-
-		}).catch(err => {
-			console.log("PDF_FETCH_ERROR", err)
-		})
+	},
+	methods: {
+		handleDownload() {
+			this.pdfFactory.download()
+		},
+		async handleAnnotate({ type, data }) {
+			this.pdfFactory[type](data)
+		}
 	}
 }
 </script>
