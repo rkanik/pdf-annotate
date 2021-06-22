@@ -1,19 +1,11 @@
 <template>
 	<div class="canvas-sizer" :id="`canvas-sizer-${this.pageNumber}`">
 		<canvas :id="`canvas-${pageNumber}`" />
-		<div class="annotationLayer" :id="`annotation-layer-${pageNumber}`" />
 	</div>
 </template>
 <script>
-import { mapMutations } from "vuex";
+import { _TOOLS } from '../consts'
 import { fabric } from "fabric/dist/fabric";
-
-// DATA
-const _toolTypes = {
-	rect: 100,
-	circle: 101,
-	highlight: 102
-}
 
 export default {
 	name: "PDFPage",
@@ -41,6 +33,11 @@ export default {
 	},
 	created() {
 		this.scale = this.rootScale
+
+		this.$on('draw', data => {
+			console.log('On Draw', data);
+		})
+
 	},
 	computed: {
 		lastFileFabricObjects() {
@@ -69,7 +66,6 @@ export default {
 		);
 	},
 	methods: {
-		...mapMutations("pdfFile", ["setFabricCanvas"]),
 		async drawCanvas(page) {
 			const canvas = document.getElementById(`canvas-${this.pageNumber}`);
 
@@ -94,7 +90,8 @@ export default {
 			});
 
 			context.scale(600 / 96, 600 / 96);
-			const bg = canvas.toDataURL("image/png", 1);
+			// const bg = canvas.toDataURL("image/png", 1);
+			const bg = canvas.toDataURL();
 			const upperCanvas = new fabric.Canvas(`canvas-${this.pageNumber}`, {
 				allowTouchScrolling: true,
 				renderInteractiveForms: true,
@@ -158,7 +155,7 @@ export default {
 				? this.upperCanvas.getPointer(event.touches[0])
 				: this.upperCanvas.getPointer(event);
 
-			if (this.elementType === _toolTypes.highlight) {
+			if (this.elementType === _TOOLS.HIGHLIGHT) {
 
 				this.highLightDrawing = true;
 
@@ -194,7 +191,7 @@ export default {
 					}
 				})
 			}
-			else if (this.elementType === _toolTypes.rect) {
+			else if (this.elementType === _TOOLS.RECT) {
 
 				this.lastElementCoockedID = ant.id = new Date().getTime();
 
@@ -239,34 +236,33 @@ export default {
 };
 </script>
 <style lang="scss">
-	.canvas-sizer {
-		position: relative;
-		margin: 0 auto 1rem auto !important;
-		overflow: visible !important;
-		&:last-child {
-			margin-bottom: 0 !important;
-		}
-		.canvas-container {
-			height: max-content !important;
-			width: max-content !important;
-			canvas {
-				&:first-child {
-					touch-action: none;
-					user-select: none;
-					position: unset !important;
-					top: unset !important;
-					left: unset !important;
-					box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12),
-						0 1px 2px rgba(0, 0, 0, 0.24) !important;
-				}
-				&:last-child {
-					position: absolute !important;
-					height: 100% !important;
-					width: 100% !important;
-					top: 0 !important;
-					left: 0 !important;
-				}
+.canvas-sizer {
+	position: relative;
+	margin: 0 auto 1rem auto !important;
+	overflow: visible !important;
+	&:last-child {
+		margin-bottom: 0 !important;
+	}
+	.canvas-container {
+		height: max-content !important;
+		width: max-content !important;
+		canvas {
+			&:first-child {
+				touch-action: none;
+				user-select: none;
+				position: unset !important;
+				top: unset !important;
+				left: unset !important;
+				box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24) !important;
+			}
+			&:last-child {
+				position: absolute !important;
+				height: 100% !important;
+				width: 100% !important;
+				top: 0 !important;
+				left: 0 !important;
 			}
 		}
 	}
+}
 </style>
