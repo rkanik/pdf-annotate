@@ -18,8 +18,23 @@
 						</v-btn>
 					</div>
 					<div class="mt-auto">
-						<v-btn dark block depressed color="teal" @click="dialogs.rect = true">Add Rect</v-btn>
-						<v-btn dark block depressed color="primary" @click="handleDownload" class="mt-3">download</v-btn>
+						<v-btn
+							dark
+							block
+							depressed
+							color="teal"
+							@click="dialogs.rect = true"
+							>Add Rect</v-btn
+						>
+						<v-btn
+							dark
+							block
+							depressed
+							color="primary"
+							@click="handleDownload"
+							class="mt-3"
+							>download</v-btn
+						>
 					</div>
 				</div>
 			</v-navigation-drawer>
@@ -27,7 +42,12 @@
 		<div class="overflow-y-auto h-screen-eh flex-1">
 			<v-container class="py-8">
 				<div v-if="!loaded" class="text-center">
-					<v-progress-circular size="64" width="6" indeterminate color="primary" />
+					<v-progress-circular
+						size="64"
+						width="6"
+						indeterminate
+						color="primary"
+					/>
 				</div>
 				<PDFPage
 					:key="pageNum"
@@ -37,6 +57,7 @@
 					:pageNumber="pageNum"
 					:pdfPage="pdfPages[pageNum - 1]"
 					@annotate="handleAnnotate"
+					@fabric="fabrics = { ...fabrics, ...$event }"
 					v-for="pageNum in count.pages"
 				/>
 			</v-container>
@@ -49,33 +70,83 @@
 						<v-container fluid>
 							<v-row>
 								<v-col cols="6">
-									<v-text-field v-bind="attrs.dialog.rect" label="Page" v-model="rect.page" />
+									<v-text-field
+										label="Page"
+										type="number"
+										v-bind="attrs.dialog.rect"
+										v-model.number="rect.page"
+									/>
 								</v-col>
 								<v-col cols="6">
-									<v-text-field v-bind="attrs.dialog.rect" label="Border Width" v-model="rect.strokeWidth" />
+									<v-text-field
+										disabled
+										type="number"
+										label="Border Width"
+										v-bind="attrs.dialog.rect"
+										v-model.number="rect.strokeWidth"
+									/>
 								</v-col>
 								<v-col cols="3">
-									<v-text-field v-bind="attrs.dialog.rect" label="X1" v-model="rect.rect[0]" />
+									<v-text-field
+										label="X1"
+										v-bind="attrs.dialog.rect"
+										v-model.number="rect.rect[0]"
+									/>
 								</v-col>
 								<v-col cols="3">
-									<v-text-field v-bind="attrs.dialog.rect" label="Y1" v-model="rect.rect[1]" />
+									<v-text-field
+										label="Y1"
+										type="number"
+										v-bind="attrs.dialog.rect"
+										v-model.number="rect.rect[1]"
+									/>
 								</v-col>
 								<v-col cols="3">
-									<v-text-field v-bind="attrs.dialog.rect" label="X2" v-model="rect.rect[2]" />
+									<v-text-field
+										label="X2"
+										type="number"
+										v-bind="attrs.dialog.rect"
+										v-model.number="rect.rect[2]"
+									/>
 								</v-col>
 								<v-col cols="3">
-									<v-text-field v-bind="attrs.dialog.rect" label="Y2" v-model="rect.rect[3]" />
+									<v-text-field
+										label="Y2"
+										type="number"
+										v-bind="attrs.dialog.rect"
+										v-model.number="rect.rect[3]"
+									/>
 								</v-col>
 								<v-col cols="6" class="relative">
-									<v-text-field v-bind="attrs.dialog.rect" label="Border Color" v-model="rect.stroke" />
-									<div class="color-box" :style="{ backgroundColor: rect.stroke }"></div>
+									<v-text-field
+										v-bind="attrs.dialog.rect"
+										label="Border Color"
+										v-model="rect.stroke"
+									/>
+									<div
+										class="color-box"
+										:style="{ backgroundColor: rect.stroke }"
+									></div>
 								</v-col>
 								<v-col cols="6" class="relative">
-									<v-text-field v-bind="attrs.dialog.rect" label="Background Color" v-model="rect.fill" />
-									<div class="color-box" :style="{ backgroundColor: rect.fill }"></div>
+									<v-text-field
+										v-bind="attrs.dialog.rect"
+										label="Background Color"
+										v-model="rect.fill"
+									/>
+									<div
+										class="color-box"
+										:style="{ backgroundColor: rect.fill }"
+									></div>
 								</v-col>
 								<v-col cols="12">
-									<v-btn block depressed color="primary" @click="handleDrawRect">Draw</v-btn>
+									<v-btn
+										block
+										depressed
+										color="primary"
+										@click="handleDrawRect"
+										>Draw</v-btn
+									>
 								</v-col>
 							</v-row>
 						</v-container>
@@ -88,6 +159,9 @@
 
 <script>
 import { _TOOLS } from '../consts'
+import { toRGBObject } from '../helpers'
+import { createRectangle } from '../draw.helpers'
+import { fabric as Fabric } from "fabric/dist/fabric";
 
 // PDFJS
 import PDF from "pdfjs-dist/build/pdf";
@@ -101,11 +175,11 @@ import { AnnotationFactory } from 'annotpdf';
 import PDFPage from '@/components/PDFPage'
 
 const initialRect = () => ({
-	page: 0,
+	page: 1,
 	strokeWidth: 1,
-	rect: ['', '', '', ''],
-	stroke: 'rgba(0, 0, 0, 1)',
-	fill: "rgba(0, 0, 0, 0)"
+	rect: [100, 100, 400, 400],
+	stroke: 'rgb(0, 0, 0)',
+	fill: ""
 })
 
 export default {
@@ -119,6 +193,7 @@ export default {
 		loaded: false,
 		scale: 1.5,
 		pdfPages: [],
+		fabrics: {},
 		count: {
 			pages: 0
 		},
@@ -159,16 +234,52 @@ export default {
 				this.pdfPages.push(page);
 			}
 
-			console.log(await pdf.getData())
 			this.pdfFactory = new AnnotationFactory(await pdf.getData())
-			console.log(this.pdfFactory)
 		}
 		catch (error) { console.log('Error:', error.message) }
 		this.loaded = true
 	},
 	methods: {
 		handleDrawRect() {
-			this.$emit('draw', this.rect)
+			const {
+				rect: [x1, y1, x2, y2],
+				page, fill, stroke, strokeWidth,
+			} = this.rect
+
+			let rect = createRectangle({
+				page: page - 1, strokeWidth, fill, stroke,
+				top: Math.min(y1, y2),
+				left: Math.min(x1, x2),
+				height: Math.abs(y1 - y2),
+				width: Math.abs(x1 - x2)
+			})
+
+			const fabric = this.fabrics[page - 1]
+			fabric.add(new Fabric.Rect(rect))
+
+			const viewport = this.pdfPages[page].getViewport({ scale: 1 })
+			const [top, left, height, width] = [
+				rect.top, rect.left,
+				rect.height, rect.width
+			].map(e => e / this.scale)
+
+			this.handleAnnotate({
+				type: 'createSquareAnnotation',
+				data: {
+					page: page - 1,
+					fill: toRGBObject(fill),
+					color: toRGBObject(stroke),
+					rect: [
+						...this.topLeftToBottomLeft([left, top], viewport.height),
+						...this.topLeftToBottomLeft([left + width, top + height], viewport.height),
+					],
+				}
+			})
+
+			this.dialogs.rect = false
+		},
+		topLeftToBottomLeft([x, y], height) {
+			return [x, height - y]
 		},
 		handleDownload() {
 			this.pdfFactory.download()
@@ -180,13 +291,13 @@ export default {
 }
 </script>
 <style lang="scss" scoped>
-.color-box {
-	top: 50%;
-	right: 1rem;
-	width: 2rem;
-	height: 2rem;
-	position: absolute;
-	transform: translateY(-50%);
-	border-radius: 2px;
-}
+	.color-box {
+		top: 50%;
+		right: 1rem;
+		width: 2rem;
+		height: 2rem;
+		position: absolute;
+		transform: translateY(-50%);
+		border-radius: 2px;
+	}
 </style>

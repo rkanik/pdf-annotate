@@ -71,7 +71,7 @@ export default {
 
 			this.fabricObj = fabric;
 
-			const viewport = page.getViewport(this.scale);
+			const viewport = page.getViewport({ scale: this.scale });
 
 			canvas.width = viewport.width;
 			canvas.height = viewport.height;
@@ -82,12 +82,14 @@ export default {
 			context.fillRect(0, 0, viewport.width, viewport.height);
 			context.restore();
 
-			await page.render({
+			const renderer = page.render({
 				canvasContext: context,
 				transform: [1, 0, 0, 1, 0, 0],
 				viewport,
 				intent: "print"
 			});
+
+			await renderer.promise
 
 			context.scale(600 / 96, 600 / 96);
 			// const bg = canvas.toDataURL("image/png", 1);
@@ -112,7 +114,9 @@ export default {
 			this.setUpperCanvasMouseEvents(upperCanvas);
 			this.canvasSizer.style.cssText = "width:max-content";
 
-			this.$emit("done", this.pageNumber);
+			// console.log(upperCanvas, upperCanvas.upperCanvasEl)
+
+			this.$emit("fabric", { [this.pageNumber - 1]: upperCanvas });
 		},
 		setUpperCanvasMouseEvents(upperCanvas) {
 			upperCanvas.on("mouse:up", e => this.mouseUpFunction(e, upperCanvas));
@@ -139,16 +143,16 @@ export default {
 		fabricClickHandler(event, fabricObj) {
 			const clientRect = fabricObj.upperCanvasEl.getBoundingClientRect()
 			const ant = {
-				left: event.clientX - clientRect.left,
-				top: event.clientY - clientRect.top,
+				padding: 3,
 				cornerSize: 0,
+				borderColor: "green",
 				selectionLineWidth: 1,
+				borderDashArray: [3, 3],
+				hasRotatingPoint: false,
 				transparentCorners: true,
 				cornerColor: "hsl(141, 71%, 48%)",
-				hasRotatingPoint: false,
-				padding: 3,
-				borderDashArray: [3, 3],
-				borderColor: "green",
+				left: event.clientX - clientRect.left,
+				top: event.clientY - clientRect.top,
 			};
 
 			const pointer = event.touches
@@ -174,7 +178,7 @@ export default {
 				fabricObj.add(contentToAdd);
 
 				// const length = 200, height = 20
-				const viewport = this.pdfPage.getViewport(1)
+				const viewport = this.pdfPage.getViewport({ scale: 1 })
 				const aLeft = ant.left / this.rootScale
 				const aTop = ant.top / this.rootScale
 
@@ -210,7 +214,7 @@ export default {
 				this.lastActiveLineObj = contentToAdd;
 				fabricObj.add(contentToAdd);
 
-				const viewport = this.pdfPage.getViewport(1)
+				const viewport = this.pdfPage.getViewport({ scale: 1 })
 				const [top, left, height, width] = [
 					ant.top, ant.left,
 					ant.height, ant.width
@@ -236,33 +240,34 @@ export default {
 };
 </script>
 <style lang="scss">
-.canvas-sizer {
-	position: relative;
-	margin: 0 auto 1rem auto !important;
-	overflow: visible !important;
-	&:last-child {
-		margin-bottom: 0 !important;
-	}
-	.canvas-container {
-		height: max-content !important;
-		width: max-content !important;
-		canvas {
-			&:first-child {
-				touch-action: none;
-				user-select: none;
-				position: unset !important;
-				top: unset !important;
-				left: unset !important;
-				box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24) !important;
-			}
-			&:last-child {
-				position: absolute !important;
-				height: 100% !important;
-				width: 100% !important;
-				top: 0 !important;
-				left: 0 !important;
+	.canvas-sizer {
+		position: relative;
+		margin: 0 auto 1rem auto !important;
+		overflow: visible !important;
+		&:last-child {
+			margin-bottom: 0 !important;
+		}
+		.canvas-container {
+			height: max-content !important;
+			width: max-content !important;
+			canvas {
+				&:first-child {
+					touch-action: none;
+					user-select: none;
+					position: unset !important;
+					top: unset !important;
+					left: unset !important;
+					box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12),
+						0 1px 2px rgba(0, 0, 0, 0.24) !important;
+				}
+				&:last-child {
+					position: absolute !important;
+					height: 100% !important;
+					width: 100% !important;
+					top: 0 !important;
+					left: 0 !important;
+				}
 			}
 		}
 	}
-}
 </style>
